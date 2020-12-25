@@ -114,7 +114,7 @@ struct State {
 }
 
 fn rotate_player(
-    mut state: Local<State>,
+    mut state: ResMut<State>,
     time: Res<Time>,
     mouse_motion_events: Res<Events<MouseMotion>>,
     mut player_query: Query<(&mut Player, &mut Transform)>,
@@ -145,10 +145,8 @@ fn rotate_player(
 }
 
 fn move_player(
-    mut state: Local<State>,
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
-    mouse_motion_events: Res<Events<MouseMotion>>,
     mut _materials: ResMut<Assets<StandardMaterial>>,
     mut query: Query<(&Player, &mut Transform, &Handle<StandardMaterial>)>,
 ) {

@@ -1,29 +1,43 @@
 use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin},
+    input::mouse::{MouseButtonInput, MouseMotion, MouseWheel},
     prelude::*,
+    window::CursorMoved,
 };
 use bevy_rapier3d::physics::RapierPhysicsPlugin;
 use bevy_rapier3d::rapier::dynamics::RigidBodyBuilder;
 use bevy_rapier3d::rapier::geometry::ColliderBuilder;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-struct Player {}
+struct Camera;
+
+struct Player {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub sensitivity: f32,
+}
 
 impl Player {
-    fn new() -> Player {
-        return Player {};
+    fn new() -> Self {
+        return Self {
+            yaw: 0.0,
+            pitch: 0.0,
+            sensitivity: 30.0,
+        };
     }
 }
 
 fn main() {
     App::build()
+        .init_resource::<State>()
         .add_resource(Msaa { samples: 4 })
         .add_plugin(RapierPhysicsPlugin)
         .add_plugins(DefaultPlugins)
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_plugin(PrintDiagnosticsPlugin::default())
         .add_startup_system(setup.system())
-        .add_system(move_cubes.system())
+        .add_system(rotate_player.system())
+        .add_system(move_player.system())
         .run();
 }
 
@@ -42,9 +56,10 @@ fn setup(
         // camera
         .spawn(Camera3dBundle {
             transform: Transform::from_translation(Vec3::new(35.0, 35.0, 35.0))
-                .looking_at(Vec3::default(), Vec3::unit_y()),
+                .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::unit_y()),
             ..Default::default()
-        });
+        })
+        .with(Camera);
 
     let mut rng = StdRng::from_entropy();
     let player_handle = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
@@ -70,8 +85,8 @@ fn setup(
             ..Default::default()
         })
         .with(Player::new())
-        .with(player_body)
-        .with(player_collider)
+        // .with(player_body)
+        // .with(player_collider)
         // platform
         .spawn(PbrBundle {
             mesh: platform_handle.clone(),
@@ -85,42 +100,80 @@ fn setup(
             }),
             transform: Transform::from_translation(Vec3::new(-50.0, -60.0, -50.0)),
             ..Default::default()
-        })
-        .with(platform_body)
-        .with(platform_collider);
+        });
+    // .with(platform_body)
+    // .with(platform_collider);
 }
 
-fn move_cubes(
+#[derive(Default)]
+struct State {
+    mouse_button_event_reader: EventReader<MouseButtonInput>,
+    mouse_motion_event_reader: EventReader<MouseMotion>,
+    cursor_moved_event_reader: EventReader<CursorMoved>,
+    mouse_wheel_event_reader: EventReader<MouseWheel>,
+}
+
+fn rotate_player(
+    mut state: Local<State>,
+    time: Res<Time>,
+    mouse_motion_events: Res<Events<MouseMotion>>,
+    mut player_query: Query<(&mut Player, &mut Transform)>,
+    mut camera_query: Query<(&Camera, &mut Transform)>,
+) {
+    let mut delta = Vec2::zero();
+    for event in state.mouse_motion_event_reader.iter(&mouse_motion_events) {
+        println!("{:?}", event);
+        delta += event.delta;
+    }
+
+    let mut yaw_rad = 0.0;
+    let mut pitch_rad = 0.0;
+
+    for (mut player, mut transform) in player_query.iter_mut() {
+        player.yaw -= delta.x * player.sensitivity * time.delta_seconds();
+        player.pitch += delta.y * player.sensitivity * time.delta_seconds();
+        yaw_rad = player.yaw.to_radians();
+        pitch_rad = player.pitch.to_radians();
+        transform.rotation = Quat::from_axis_angle(Vec3::unit_y(), yaw_rad)
+            * Quat::from_axis_angle(-Vec3::unit_x(), pitch_rad);
+    }
+
+    for (_, mut transform) in camera_query.iter_mut() {
+        transform.rotation = Quat::from_axis_angle(Vec3::unit_y(), yaw_rad)
+            * Quat::from_axis_angle(-Vec3::unit_x(), pitch_rad);
+    }
+}
+
+fn move_player(
+    mut state: Local<State>,
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
+    mouse_motion_events: Res<Events<MouseMotion>>,
     mut _materials: ResMut<Assets<StandardMaterial>>,
     mut query: Query<(&Player, &mut Transform, &Handle<StandardMaterial>)>,
 ) {
+    let mut offset = Vec3::new(0.0, 0.0, 0.0);
+    if keyboard_input.pressed(KeyCode::Left) {
+        offset.x -= 10.0;
+    }
+    if keyboard_input.pressed(KeyCode::Right) {
+        offset.x += 10.0;
+    }
+    if keyboard_input.pressed(KeyCode::Up) {
+        offset.z -= 10.0;
+    }
+    if keyboard_input.pressed(KeyCode::Down) {
+        offset.z += 10.0;
+    }
+    if keyboard_input.pressed(KeyCode::Space) {
+        offset.y += 10.0;
+    }
+    if keyboard_input.pressed(KeyCode::C) {
+        offset.z -= 10.0;
+    }
+
     for (_player, mut transform, _material_handle) in query.iter_mut() {
-        // let material = materials.get_mut(material_handle).unwrap();
-
-        let mut offset = Vec3::new(0.0, 0.0, 0.0);
-        if keyboard_input.pressed(KeyCode::Left) {
-            offset.x -= 10.0;
-        }
-        if keyboard_input.pressed(KeyCode::Right) {
-            offset.x += 10.0;
-        }
-        if keyboard_input.pressed(KeyCode::Up) {
-            offset.z -= 10.0;
-        }
-        if keyboard_input.pressed(KeyCode::Down) {
-            offset.z += 10.0;
-        }
-        if keyboard_input.pressed(KeyCode::Space) {
-            offset.y += 10.0;
-        }
-        if keyboard_input.pressed(KeyCode::C) {
-            offset.z -= 10.0;
-        }
-
+        // transform.rotate
         transform.translation += offset * time.delta_seconds();
-        // material.albedo =
-        //     Color::BLUE * Vec3::splat((3.0 * time.seconds_since_startup() as f32).sin());
     }
 }

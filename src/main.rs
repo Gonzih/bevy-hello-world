@@ -61,12 +61,33 @@ fn setup(
 
 fn move_cubes(
     time: Res<Time>,
+    keyboard_input: Res<Input<KeyCode>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut query: Query<(&mut Transform, &Handle<StandardMaterial>)>,
 ) {
     for (mut transform, material_handle) in query.iter_mut() {
         let material = materials.get_mut(material_handle).unwrap();
-        transform.translation += Vec3::new(1.0, 0.0, 0.0) * time.delta_seconds();
+        let mut offset  = Vec3::new(0.0, 0.0, 0.0);
+        if keyboard_input.pressed(KeyCode::Left) {
+            offset.x -= 10.0;
+        }
+        if keyboard_input.pressed(KeyCode::Right) {
+            offset.x += 10.0;
+        }
+        if keyboard_input.pressed(KeyCode::Up) {
+            offset.z -= 10.0;
+        }
+        if keyboard_input.pressed(KeyCode::Down) {
+            offset.z += 10.0;
+        }
+        if keyboard_input.pressed(KeyCode::Space) {
+            offset.y += 10.0;
+        }
+        if keyboard_input.pressed(KeyCode::LControl) {
+            offset.z -= 10.0;
+        }
+
+        transform.translation += offset * time.delta_seconds();
         material.albedo =
             Color::BLUE * Vec3::splat((3.0 * time.seconds_since_startup() as f32).sin());
     }

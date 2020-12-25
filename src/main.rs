@@ -2,8 +2,18 @@ use bevy::{
     diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin},
     prelude::*,
 };
-use rand::{rngs::StdRng, Rng, SeedableRng};
 use bevy_rapier3d::physics::RapierPhysicsPlugin;
+use bevy_rapier3d::rapier::dynamics::RigidBodyBuilder;
+use bevy_rapier3d::rapier::geometry::ColliderBuilder;
+use rand::{rngs::StdRng, Rng, SeedableRng};
+
+struct Player {}
+
+impl Player {
+    fn new() -> Player {
+        return Player {};
+    }
+}
 
 fn main() {
     App::build()
@@ -31,43 +41,65 @@ fn setup(
         })
         // camera
         .spawn(Camera3dBundle {
-            transform: Transform::from_translation(Vec3::new(0.0, 15.0, 150.0))
+            transform: Transform::from_translation(Vec3::new(35.0, 35.0, 35.0))
                 .looking_at(Vec3::default(), Vec3::unit_y()),
             ..Default::default()
         });
 
     let mut rng = StdRng::from_entropy();
-    let cube_handle = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
-    for _ in 0..10000 {
-        commands.spawn(PbrBundle {
-            mesh: cube_handle.clone(),
+    let player_handle = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
+    let player_body = RigidBodyBuilder::new_dynamic();
+    let player_collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0);
+
+    let platform_handle = meshes.add(Mesh::from(shape::Cube { size: 100.0 }));
+    let platform_body = RigidBodyBuilder::new_static();
+    let platform_collider = ColliderBuilder::cuboid(100.0, 100.0, 100.0);
+
+    commands
+        .spawn(PbrBundle {
+            mesh: player_handle.clone(),
             material: materials.add(StandardMaterial {
                 albedo: Color::rgb(
-                    rng.gen_range(0.0, 1.0),
-                    rng.gen_range(0.0, 1.0),
-                    rng.gen_range(0.0, 1.0),
+                    rng.gen_range(0.0..1.0),
+                    rng.gen_range(0.0..1.0),
+                    rng.gen_range(0.0..1.0),
                 ),
                 ..Default::default()
             }),
-            transform: Transform::from_translation(Vec3::new(
-                rng.gen_range(-50.0, 50.0),
-                rng.gen_range(-50.0, 50.0),
-                0.0,
-            )),
+            transform: Transform::from_translation(Vec3::new(0.0, 10.0, 0.0)),
             ..Default::default()
-        });
-    }
+        })
+        .with(Player::new())
+        .with(player_body)
+        .with(player_collider)
+        // platform
+        .spawn(PbrBundle {
+            mesh: platform_handle.clone(),
+            material: materials.add(StandardMaterial {
+                albedo: Color::rgb(
+                    rng.gen_range(0.0..1.0),
+                    rng.gen_range(0.0..1.0),
+                    rng.gen_range(0.0..1.0),
+                ),
+                ..Default::default()
+            }),
+            transform: Transform::from_translation(Vec3::new(-50.0, -60.0, -50.0)),
+            ..Default::default()
+        })
+        .with(platform_body)
+        .with(platform_collider);
 }
 
 fn move_cubes(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut query: Query<(&mut Transform, &Handle<StandardMaterial>)>,
+    mut _materials: ResMut<Assets<StandardMaterial>>,
+    mut query: Query<(&Player, &mut Transform, &Handle<StandardMaterial>)>,
 ) {
-    for (mut transform, material_handle) in query.iter_mut() {
-        let material = materials.get_mut(material_handle).unwrap();
-        let mut offset  = Vec3::new(0.0, 0.0, 0.0);
+    for (_player, mut transform, _material_handle) in query.iter_mut() {
+        // let material = materials.get_mut(material_handle).unwrap();
+
+        let mut offset = Vec3::new(0.0, 0.0, 0.0);
         if keyboard_input.pressed(KeyCode::Left) {
             offset.x -= 10.0;
         }
@@ -83,12 +115,12 @@ fn move_cubes(
         if keyboard_input.pressed(KeyCode::Space) {
             offset.y += 10.0;
         }
-        if keyboard_input.pressed(KeyCode::LControl) {
+        if keyboard_input.pressed(KeyCode::C) {
             offset.z -= 10.0;
         }
 
         transform.translation += offset * time.delta_seconds();
-        material.albedo =
-            Color::BLUE * Vec3::splat((3.0 * time.seconds_since_startup() as f32).sin());
+        // material.albedo =
+        //     Color::BLUE * Vec3::splat((3.0 * time.seconds_since_startup() as f32).sin());
     }
 }

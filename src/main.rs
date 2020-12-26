@@ -1,8 +1,10 @@
 use bevy::{
-    diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin},
+    // diagnostic::{FrameTimeDiagnosticsPlugin, PrintDiagnosticsPlugin},
     input::mouse::{MouseButtonInput, MouseMotion, MouseWheel},
     prelude::*,
     window::CursorMoved,
+    window::WindowId,
+    winit::WinitWindows,
 };
 use bevy_rapier3d::physics::RapierPhysicsPlugin;
 use bevy_rapier3d::rapier::dynamics::RigidBodyBuilder;
@@ -44,6 +46,7 @@ fn main() {
         // loop
         .add_system(rotate_player.system())
         .add_system(move_player.system())
+        .add_system(mouse_capture_system.system())
         .run();
 }
 
@@ -134,6 +137,13 @@ fn rotate_player(
     for (mut player, mut transform) in player_query.iter_mut() {
         player.yaw -= delta.x * player.sensitivity * time.delta_seconds();
         player.pitch += delta.y * player.sensitivity * time.delta_seconds();
+
+        if player.pitch < -90.0 {
+            player.pitch = -90.0;
+        } else if player.pitch > 90.0 {
+            player.pitch = 90.0
+        }
+
         yaw_rad = player.yaw.to_radians();
         pitch_rad = player.pitch.to_radians();
         transform.rotation = Quat::from_axis_angle(Vec3::unit_y(), yaw_rad);
@@ -176,5 +186,26 @@ fn move_player(
 
     for (_, mut transform) in query.iter_mut() {
         transform.translation += offset * time.delta_seconds();
+    }
+}
+
+fn mouse_capture_system(
+    mut state: ResMut<State>,
+    mouse_button_events: Res<Events<MouseButtonInput>>,
+    windows: Res<WinitWindows>,
+) {
+    if let Some(event) = state.mouse_button_event_reader.latest(&mouse_button_events) {
+        let window = windows.get_window(WindowId::primary()).unwrap();
+        match event.button {
+            MouseButton::Left => {
+                window.set_cursor_grab(true).unwrap();
+                window.set_cursor_visible(false);
+            }
+            MouseButton::Right => {
+                window.set_cursor_grab(false).unwrap();
+                window.set_cursor_visible(true);
+            }
+            _ => (),
+        }
     }
 }

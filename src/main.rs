@@ -23,8 +23,8 @@ struct Player {
 impl Player {
     fn new() -> Self {
         return Self {
-            yaw: 34.0,
-            pitch: 12.0,
+            yaw: 90.0,
+            pitch: 0.0,
             sensitivity: 30.0,
         };
     }
@@ -64,7 +64,7 @@ fn setup(
         })
         // camera
         .spawn(Camera3dBundle {
-            transform: Transform::from_translation(Vec3::new(35.0, -1.0, 35.0)),
+            transform: Transform::from_translation(Vec3::new(50.0, 0.0, 0.0)),
             ..Default::default()
         })
         .with(Camera);
@@ -150,7 +150,6 @@ fn rotate_player(
 
         println!("Player yaw = {}, pitch = {}", player.yaw, player.pitch);
     }
-
 
     for (_, mut transform) in camera_query.iter_mut() {
         transform.rotation = Quat::from_axis_angle(Vec3::unit_y(), yaw_rad)

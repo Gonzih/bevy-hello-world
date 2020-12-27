@@ -225,11 +225,12 @@ fn move_player(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
     options: Res<Options>,
-    mut query: Query<(&Camera, &mut Transform)>,
+    // mut player_query: Query<(&Player, &mut Transform)>,
+    mut camera_query: Query<(&Camera, &mut Transform)>,
 ) {
     let (axis_h, axis_v, axis_float) = movement_offset(&keyboard_input, &options);
 
-    for (_, mut transform) in query.iter_mut() {
+    for (_, mut transform) in camera_query.iter_mut() {
         let rotation = transform.rotation;
         let accel = (strafe_vec(&rotation) * axis_h)
             + (forward_walk_vec(&rotation) * axis_v)

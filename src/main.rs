@@ -20,13 +20,37 @@ struct Player {
     pub sensitivity: f32,
 }
 
-impl Player {
-    fn new() -> Self {
-        return Self {
+impl Default for Player {
+    fn default() -> Self {
+        Self {
             yaw: 90.0,
             pitch: 0.0,
             sensitivity: 30.0,
-        };
+        }
+    }
+}
+
+struct Options {
+    pub key_backward: KeyCode,
+    pub key_forward: KeyCode,
+    pub key_left: KeyCode,
+    pub key_right: KeyCode,
+    pub key_up: KeyCode,
+    pub key_down: KeyCode,
+    pub speed: f32,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            key_backward: KeyCode::Down,
+            key_forward: KeyCode::Up,
+            key_left: KeyCode::Left,
+            key_right: KeyCode::Right,
+            key_up: KeyCode::Space,
+            key_down: KeyCode::LShift,
+            speed: 10.0,
+        }
     }
 }
 
@@ -34,6 +58,7 @@ fn main() {
     App::build()
         // resources
         .init_resource::<State>()
+        .init_resource::<Options>()
         .add_resource(Msaa { samples: 4 })
         // plugins
         .add_plugin(RapierRenderPlugin)
@@ -91,7 +116,7 @@ fn setup(
             }),
             ..Default::default()
         })
-        .with(Player::new())
+        .with(Player::default())
         .with(player_body)
         .with(player_collider)
         // platform
@@ -117,6 +142,7 @@ struct State {
     mouse_motion_event_reader: EventReader<MouseMotion>,
     cursor_moved_event_reader: EventReader<CursorMoved>,
     mouse_wheel_event_reader: EventReader<MouseWheel>,
+    cursor_hidden: bool,
 }
 
 fn rotate_player(
@@ -157,54 +183,70 @@ fn rotate_player(
     }
 }
 
+fn movement_axis(input: &Res<Input<KeyCode>>, plus: KeyCode, minus: KeyCode) -> f32 {
+    let mut axis = 0.0;
+
+    if input.pressed(plus) {
+        axis += 1.0;
+    }
+
+    if input.pressed(minus) {
+        axis -= 1.0;
+    }
+
+    axis
+}
+
+fn movement_offset(input: &Res<Input<KeyCode>>, options: &Res<Options>) -> (f32, f32, f32) {
+    (
+        movement_axis(input, options.key_right, options.key_left),
+        movement_axis(input, options.key_backward, options.key_forward),
+        movement_axis(input, options.key_up, options.key_down),
+    )
+}
+
+fn forward_vec(rotation: &Quat) -> Vec3 {
+    rotation.mul_vec3(Vec3::unit_z()).normalize()
+}
+
+fn forward_walk_vec(rotation: &Quat) -> Vec3 {
+    let f = forward_vec(rotation);
+    // flatten vector by removing y axis info
+    Vec3::new(f.x, 0.0, f.z).normalize()
+}
+
+fn strafe_vec(rotation: &Quat) -> Vec3 {
+    Quat::from_rotation_y(90.0f32.to_radians())
+        .mul_vec3(forward_walk_vec(rotation))
+        .normalize()
+}
+
 fn move_player(
     time: Res<Time>,
     keyboard_input: Res<Input<KeyCode>>,
-    mut _materials: ResMut<Assets<StandardMaterial>>,
+    options: Res<Options>,
     mut query: Query<(&Camera, &mut Transform)>,
 ) {
-    let mut offset = Vec3::new(0.0, 0.0, 0.0);
-    if keyboard_input.pressed(KeyCode::Left) {
-        offset.x -= 10.0;
-    }
-    if keyboard_input.pressed(KeyCode::Right) {
-        offset.x += 10.0;
-    }
-    if keyboard_input.pressed(KeyCode::Up) {
-        offset.z -= 10.0;
-    }
-    if keyboard_input.pressed(KeyCode::Down) {
-        offset.z += 10.0;
-    }
-    if keyboard_input.pressed(KeyCode::Space) {
-        offset.y += 10.0;
-    }
-    if keyboard_input.pressed(KeyCode::LShift) {
-        offset.y -= 10.0;
-    }
+    let (axis_h, axis_v, axis_float) = movement_offset(&keyboard_input, &options);
 
     for (_, mut transform) in query.iter_mut() {
-        transform.translation += offset * time.delta_seconds();
+        let rotation = transform.rotation;
+        let accel = (strafe_vec(&rotation) * axis_h)
+            + (forward_walk_vec(&rotation) * axis_v)
+            + (Vec3::unit_y() * axis_float);
+        let accel = accel * options.speed;
+        transform.translation += accel * time.delta_seconds();
     }
 }
 
-fn mouse_capture_system(
-    mut state: ResMut<State>,
-    mouse_button_events: Res<Events<MouseButtonInput>>,
-    windows: Res<WinitWindows>,
-) {
-    if let Some(event) = state.mouse_button_event_reader.latest(&mouse_button_events) {
-        let window = windows.get_window(WindowId::primary()).unwrap();
-        match event.button {
-            MouseButton::Left => {
-                window.set_cursor_grab(true).unwrap();
+fn mouse_capture_system(mut state: ResMut<State>, windows: Res<WinitWindows>) {
+    if !state.cursor_hidden {
+        if let Some(window) = windows.get_window(WindowId::primary()) {
+            if window.set_cursor_grab(true).is_ok() {
+                println!("Snatching users cursor!");
                 window.set_cursor_visible(false);
+                state.cursor_hidden = true;
             }
-            MouseButton::Right => {
-                window.set_cursor_grab(false).unwrap();
-                window.set_cursor_visible(true);
-            }
-            _ => (),
         }
     }
 }

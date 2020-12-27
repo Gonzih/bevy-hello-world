@@ -104,6 +104,7 @@ fn setup(
     let platform_collider = ColliderBuilder::cuboid(100.0, 0.0, 100.0);
 
     commands
+        // player
         .spawn(PbrBundle {
             mesh: player_handle.clone(),
             material: materials.add(StandardMaterial {

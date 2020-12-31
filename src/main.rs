@@ -6,10 +6,6 @@ use bevy::{
     window::WindowId,
     winit::WinitWindows,
 };
-use bevy_rapier3d::physics::RapierPhysicsPlugin;
-use bevy_rapier3d::rapier::dynamics::RigidBodyBuilder;
-use bevy_rapier3d::rapier::geometry::ColliderBuilder;
-use bevy_rapier3d::render::RapierRenderPlugin;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 struct Camera;
@@ -61,8 +57,6 @@ fn main() {
         .init_resource::<Options>()
         .add_resource(Msaa { samples: 4 })
         // plugins
-        .add_plugin(RapierRenderPlugin)
-        .add_plugin(RapierPhysicsPlugin)
         .add_plugins(DefaultPlugins)
         // .add_plugin(FrameTimeDiagnosticsPlugin::default())
         // .add_plugin(PrintDiagnosticsPlugin::default())
@@ -96,12 +90,7 @@ fn setup(
 
     let mut rng = StdRng::from_entropy();
     let player_handle = meshes.add(Mesh::from(shape::Cube { size: 1.0 }));
-    let player_body = RigidBodyBuilder::new_dynamic().translation(0.0, 100.0, 0.0);
-    let player_collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0);
-
     let platform_handle = meshes.add(Mesh::from(shape::Plane { size: 100.0 }));
-    let platform_body = RigidBodyBuilder::new_static().translation(-5.0, -5.0, -5.0);
-    let platform_collider = ColliderBuilder::cuboid(100.0, 0.0, 100.0);
 
     commands
         // player
@@ -115,11 +104,10 @@ fn setup(
                 ),
                 ..Default::default()
             }),
+            transform: Transform::from_translation(Vec3::new(0.0, 100.0, 0.0)),
             ..Default::default()
         })
         .with(Player::default())
-        .with(player_body)
-        .with(player_collider)
         // platform
         .spawn(PbrBundle {
             mesh: platform_handle.clone(),
@@ -131,18 +119,17 @@ fn setup(
                 ),
                 ..Default::default()
             }),
+            transform: Transform::from_translation(Vec3::new(-5.0, -5.0, -5.0)),
             ..Default::default()
-        })
-        .with(platform_body)
-        .with(platform_collider);
+        });
 }
 
 #[derive(Default)]
 struct State {
-    mouse_button_event_reader: EventReader<MouseButtonInput>,
+    // mouse_button_event_reader: EventReader<MouseButtonInput>,
     mouse_motion_event_reader: EventReader<MouseMotion>,
-    cursor_moved_event_reader: EventReader<CursorMoved>,
-    mouse_wheel_event_reader: EventReader<MouseWheel>,
+    // cursor_moved_event_reader: EventReader<CursorMoved>,
+    // mouse_wheel_event_reader: EventReader<MouseWheel>,
     cursor_hidden: bool,
 }
 
@@ -165,11 +152,11 @@ fn rotate_player(
         player.yaw -= delta.x * player.sensitivity * time.delta_seconds();
         player.pitch += delta.y * player.sensitivity * time.delta_seconds();
 
-        if player.pitch < -90.0 {
-            player.pitch = -90.0;
-        } else if player.pitch > 90.0 {
-            player.pitch = 90.0
-        }
+        // if player.pitch < -90.0 {
+        //     player.pitch = -90.0;
+        // } else if player.pitch > 90.0 {
+        //     player.pitch = 90.0
+        // }
 
         yaw_rad = player.yaw.to_radians();
         pitch_rad = player.pitch.to_radians();
